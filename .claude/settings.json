@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__context7__resolve-library-id",
+      "mcp__playwright",
+      "Bash",
+      "WebSearch",
+      "WebFetch",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm dlx:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm format:*)",
+      "Skill(commit-commands:commit)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ]
+}
