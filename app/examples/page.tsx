@@ -6,7 +6,7 @@ import { FormShowcase } from './form-showcase'
 import { UiShowcase } from './ui-showcase'
 
 export const metadata = {
-  title: 'Examples | StarterKit',
+  title: 'Examples',
   description: 'Component showcase for the StarterKit',
 }
 

@@ -136,16 +136,10 @@ export function FeedbackShowcase() {
           >
             Success
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.error('Error toast!')}
-          >
+          <Button variant="outline" onClick={() => toast.error('Error toast!')}>
             Error
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.info('Info toast!')}
-          >
+          <Button variant="outline" onClick={() => toast.info('Info toast!')}>
             Info
           </Button>
           <Button

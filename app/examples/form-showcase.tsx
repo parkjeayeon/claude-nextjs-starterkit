@@ -128,10 +128,7 @@ export function FormShowcase() {
       <Section title="Textarea">
         <div className="max-w-sm space-y-2">
           <Label htmlFor="demo-textarea">Description</Label>
-          <Textarea
-            id="demo-textarea"
-            placeholder="Write something here..."
-          />
+          <Textarea id="demo-textarea" placeholder="Write something here..." />
         </div>
       </Section>
 

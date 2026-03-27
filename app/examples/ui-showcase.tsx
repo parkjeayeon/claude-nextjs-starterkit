@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Text } from '@/components/ui/text'
 
 function Section({
   title,
@@ -28,6 +29,57 @@ function Section({
 export function UiShowcase() {
   return (
     <div className="space-y-10">
+      {/* Text */}
+      <Section title="Text">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">Header variants</p>
+            <div className="space-y-1">
+              <Text variant="h1" as="h1">
+                Header 1 — 30px
+              </Text>
+              <Text variant="h2" as="h2">
+                Header 2 — 24px
+              </Text>
+              <Text variant="h3" as="h3">
+                Header 3 — 20px
+              </Text>
+              <Text variant="h4" as="h4">
+                Header 4 — 18px
+              </Text>
+              <Text variant="h5" as="h5">
+                Header 5 — 14px
+              </Text>
+              <Text variant="h6" as="h6">
+                Header 6 — 12px
+              </Text>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">Body variants</p>
+            <div className="space-y-1">
+              <Text variant="body1">Body 1 — 20px</Text>
+              <Text variant="body2">Body 2 — 18px</Text>
+              <Text variant="body3">Body 3 — 16px (default)</Text>
+              <Text variant="body4">Body 4 — 15px</Text>
+              <Text variant="body5">Body 5 — 14px</Text>
+              <Text variant="body6">Body 6 — 13px</Text>
+              <Text variant="body7">Body 7 — 12px</Text>
+              <Text variant="body8">Body 8 — 10px</Text>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">Color variants</p>
+            <div className="space-y-1">
+              <Text color="default">Default color</Text>
+              <Text color="muted">Muted color</Text>
+              <Text color="destructive">Destructive color</Text>
+              <Text color="accent">Accent color</Text>
+            </div>
+          </div>
+        </div>
+      </Section>
+
       {/* Button */}
       <Section title="Button">
         <div className="space-y-4">
