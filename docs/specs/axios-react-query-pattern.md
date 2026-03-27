@@ -659,52 +659,60 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
 ---
 
-## 6. Server Component에서 초기 데이터 내려주기
+## 6. Server Component에서 데이터 가져오기
 
-Next.js Server Component에서 쿠키를 읽어 백엔드에 인증된 요청을 보내고, React Query의 캐시에 미리 채워둘 수 있다.
+### 6-1. 원칙: 서버와 클라이언트의 역할 분리
 
-### 왜 필요한가
+| 환경 | 데이터 | 페칭 방법 | 캐싱 |
+|------|--------|----------|------|
+| Server Component | **공개 데이터만** | `fetch` (Next.js extended) | Next.js 캐시 |
+| Client Component | **인증 데이터 포함 전부** | axios + React Query | React Query |
 
-- `useMe()`는 Client Component에서 실행 → 첫 렌더링 시 로딩 상태가 발생
-- Server Component에서 미리 데이터를 가져와 React Query 캐시에 주입하면 **로딩 없이 즉시 렌더링** 가능
-- SEO가 필요한 페이지에서도 서버에서 데이터가 포함된 HTML을 생성
+핵심 규칙:
+- **Server Component에서 인증된 요청을 하지 않는다**
+  - access token 만료 시 자동 refresh 불가 (interceptor = 브라우저 전용)
+  - Server Component 렌더링 중 새 토큰을 브라우저 쿠키에 쓸 수 없음
+  - refresh token이 유효한데도 로그인으로 리다이렉트되는 나쁜 UX 발생
+- **Server Component에서 React Query (`prefetchQuery`, `dehydrate`)를 쓰지 않는다**
+  - Next.js 캐시 + React Query 캐시 = 이중 캐시 → 무효화 복잡
 
-### 공식 권장 패턴: prefetchQuery + dehydrate + HydrationBoundary
+### 6-2. 왜 Server Component에서 axios가 아닌 fetch인가
+
+| | `fetch` (Next.js extended) | `axios` |
+|---|---|---|
+| 응답 캐싱 (`next: { revalidate }`) | O | X |
+| 태그 기반 무효화 (`next: { tags }`) | O | X |
+| 요청 중복 제거 (deduplication) | O | X |
+| 정적 생성 (빌드 시 데이터 포함) | O | X |
+
+### 6-3. 예제: 공개 데이터 페이지 (블로그 목록)
 
 ```tsx
-// app/dashboard/page.tsx — Server Component
-import { cookies } from 'next/headers'
-import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
-import { redirect } from 'next/navigation'
-import { Dashboard } from '@/components/dashboard'
-import { authKeys } from '@/lib/api/queries/auth'
-
-export default async function DashboardPage() {
-  const queryClient = new QueryClient()
-  const cookieStore = await cookies()
-  const allCookies = cookieStore.toString()
-
-  // Server Component에서 prefetch → QueryClient 캐시에 저장
-  await queryClient.prefetchQuery({
-    queryKey: authKeys.me,
-    queryFn: async () => {
-      const res = await fetch(`${process.env.API_URL}/auth/me`, {
-        headers: { Cookie: allCookies },
-      })
-      if (!res.ok) return null
-      return res.json()
-    },
+// app/blog/page.tsx — Server Component
+export default async function BlogPage() {
+  const res = await fetch(`${process.env.API_URL}/posts`, {
+    next: { revalidate: 60, tags: ['posts'] },
   })
+  const posts = await res.json()
 
-  const user = queryClient.getQueryData(authKeys.me)
-  if (!user) redirect('/login')
-
-  // dehydrate → 캐시를 직렬화하여 클라이언트에 전달
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <Dashboard />
-    </HydrationBoundary>
+    <ul>
+      {posts.data.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
   )
+}
+```
+
+### 6-4. 인증이 필요한 페이지는 Client Component
+
+```tsx
+// app/dashboard/page.tsx — 서버는 껍데기만
+import { Dashboard } from '@/components/dashboard'
+
+export default function DashboardPage() {
+  return <Dashboard />
 }
 ```
 
@@ -715,21 +723,60 @@ export default async function DashboardPage() {
 import { useMe } from '@/lib/api/queries/auth'
 
 export function Dashboard() {
-  // HydrationBoundary가 서버에서 prefetch한 데이터를 캐시에 주입했으므로
-  // 첫 렌더링에서 즉시 데이터가 있다 (로딩 없음)
-  // staleTime이 지나면 자동으로 리페치하여 최신 상태 유지
-  const { data: user } = useMe()
+  const { data: user, isLoading } = useMe()
+  // axios interceptor가 자동으로 refresh token 처리
 
-  return <div>Welcome, {user?.name}</div>
+  if (isLoading) return <div>Loading...</div>
+  if (!user) return null
+
+  return <div>Welcome, {user.name}</div>
 }
 ```
 
-**이 패턴의 장점:**
-- Client Component에 `initialData` prop을 넘길 필요 없음 → 컴포넌트가 깔끔
-- `useMe()`의 queryKey와 서버 prefetch의 queryKey가 일치하면 자동으로 캐시가 연결됨
-- 서버에서 prefetch한 데이터가 자동으로 staleTime/gcTime 관리 대상이 됨
+- 인증 데이터는 항상 클라이언트에서 → refresh token 자동 처리 ✓
+- SEO가 필요 없는 인증 페이지에 적합 (대시보드, 마이페이지 등)
 
-> **주의**: Server Component에서는 axios가 아닌 `fetch`를 직접 사용한다. axios의 interceptor(refresh token 등)는 브라우저 환경에서만 동작하므로, 서버에서는 쿠키를 수동으로 전달해야 한다. `process.env.API_URL`은 `NEXT_PUBLIC_` 접두사가 없는 서버 전용 환경변수를 사용한다.
+### 6-5. 서버 캐시 무효화: Server Action + revalidateTag
+
+클라이언트에서 mutation 후, **공개 데이터**의 Next.js 서버 캐시도 갱신하려면:
+
+```ts
+// app/actions/revalidate.ts
+'use server'
+import { revalidateTag } from 'next/cache'
+
+export async function revalidatePostsCache() {
+  revalidateTag('posts')
+}
+```
+
+```ts
+// mutation onSuccess에서 호출
+export function useCreatePost() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: postService.create,
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() })
+      await revalidatePostsCache() // 공개 데이터의 서버 캐시 갱신
+    },
+  })
+}
+```
+
+### 6-6. 정리표
+
+| 데이터 종류 | 렌더링 위치 | 페칭 | 캐싱 | 무효화 |
+|-----------|-----------|------|------|--------|
+| 공개 (블로그, 상품 등) | Server Component | `fetch` | Next.js (`revalidate` + `tags`) | `revalidateTag` |
+| 인증 (유저 정보, 대시보드) | Client Component | axios | React Query | `invalidateQueries` |
+| 공개 데이터 mutation 후 | 양쪽 | - | 양쪽 | `invalidateQueries` + `revalidateTag` |
+
+### 6-7. 주의
+
+> **Server Component에서는 axios를 쓰지 않는다.** axios interceptor(refresh token)는 브라우저 전용이고, Next.js 캐싱은 `fetch`에서만 동작한다. `process.env.API_URL`은 `NEXT_PUBLIC_` 없는 서버 전용 환경변수.
+
+> **Server Component에서 인증된 요청을 하지 않는다.** access token 만료 시 서버에서는 자동 refresh가 불가능하다. 인증이 필요한 데이터는 항상 Client Component에서 axios + React Query로 가져온다.
 
 ---
 
@@ -759,10 +806,10 @@ React Query의 캐시를 Zustand에 복사하지 않는다. 서버 데이터는 
 
 ### SSR/SEO 한계
 
-이 패턴은 기본적으로 **CSR (Client-Side Rendering)**이다:
+axios + React Query는 기본적으로 **CSR (Client-Side Rendering)**이다:
 - 첫 페이지 로드 시 HTML에 데이터가 없음 → SEO에 불리
-- Server Component에서 `initialData`를 내려주면 SSR 가능 (위 섹션 6 참고)
-- SEO가 중요한 공개 페이지는 Server Component에서 직접 fetch하는 것이 더 간단
+- SEO가 중요한 공개 페이지는 Server Component에서 `fetch`로 직접 가져온다 (섹션 6 참고)
+- 인증이 필요한 페이지(대시보드, 마이페이지)는 SEO가 불필요하므로 CSR로 충분
 
 ### 환경변수 노출
 
