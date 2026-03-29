@@ -34,6 +34,13 @@ case "$EVENT" in
     DESC="Claude가 권한 승인을 기다리고 있습니다."
     ;;
   Stop)
+    # Skip if the last tool use was a git commit (already notified by notify-commit.sh)
+    if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
+      LAST_BASH=$(grep '"tool_name":"Bash"' "$TRANSCRIPT" | tail -1)
+      if echo "$LAST_BASH" | grep -q 'git commit'; then
+        exit 0
+      fi
+    fi
     EMOJI=":white_check_mark:"
     TITLE="*작업 완료*"
     DESC="결과를 확인해주세요."
